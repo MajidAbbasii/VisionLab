@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <title>Model Card — VisionLab</title>
+  <link rel="stylesheet" href="./assets/site.css">
+  <style>
+    .document{padding:70px 0 100px;max-width:850px}.document h1{font-size:42px;letter-spacing:-2px;margin:12px 0}.document h2{font-size:19px;margin:36px 0 10px}.document p,.document li{font-size:12px;color:#aab6ca;line-height:1.9}.document code{font-family:var(--mono);font-size:10px;color:var(--mint);overflow-wrap:anywhere}.document table{width:100%;border-collapse:collapse;margin:18px 0}.document th,.document td{text-align:left;padding:12px;border-bottom:1px solid #2a3955;font-size:10px;vertical-align:top}.document th{color:var(--mint);font-family:var(--mono);font-weight:500}.document td{color:#b4bfd2}.document a{color:var(--mint);text-decoration:underline}.back{display:inline-block;margin-top:24px;color:var(--mint);font-size:11px}
+  </style>
+</head>
+<body>
+  <header class="topbar shell"><a class="brand" href="./index.html"><span class="brand-mark"><span></span><span></span><span></span><span></span></span><span>Vision<span class="brand-accent">Lab</span></span></a><a class="nav-cta" href="./index.html#demo">Try the demo <span>↗</span></a></header>
+  <main class="shell document">
+    <div class="eyebrow">MODEL CARD / VERSION 1.0.0-RC1</div>
+    <h1>YOLO11n Object Detector</h1>
+    <p>VisionLab's selected model is a compact YOLO11n object detector fine-tuned for an educational experiment on COCO-derived data. It is intended for learning, experimentation and evaluation—not safety-critical, medical, biometric or other high-impact decisions.</p>
+    <h2>Model specification</h2>
+    <table><tbody>
+      <tr><th>Architecture</th><td>Ultralytics YOLO11n · object detection</td></tr>
+      <tr><th>Classes</th><td>80 COCO categories</td></tr>
+      <tr><th>Input</th><td><code>images</code> · float32 · <code>[1, 3, 640, 640]</code></td></tr>
+      <tr><th>Output</th><td><code>output0</code> · float32 · <code>[1, 84, 8400]</code> (raw predictions; NMS is performed by the client)</td></tr>
+      <tr><th>Export</th><td>ONNX opset 17 · Ultralytics 8.4.215 · 20 November 2026</td></tr>
+      <tr><th>Browser runtime</th><td>ONNX Runtime Web 1.23.2 · WebAssembly CPU provider</td></tr>
+      <tr><th>License</th><td>AGPL-3.0 for Ultralytics YOLO model artifacts; see <a href="./THIRD-PARTY-NOTICES.md">third-party notices</a> and <a href="./LICENSE">project license</a></td></tr>
+    </tbody></table>
+    <h2>Training and evaluation</h2>
+    <p>The selected fine-tuned checkpoint is <code>models/trained/best_coco2017_expanded_epoch1.pt</code>. Its metadata records Ultralytics 8.4.215, the <code>datasets/coco2017_expanded.yaml</code> configuration, seed 20261120, image size 640, batch size 4 and a planned 100-epoch budget. The run was intentionally stopped after 10 epochs; the selected best checkpoint is from epoch 1.</p>
+    <table><tbody>
+      <tr><th>Test split</th><td>5,000 COCO-derived images</td></tr>
+      <tr><th>Precision</th><td>0.48972</td></tr>
+      <tr><th>Recall</th><td>0.35184</td></tr>
+      <tr><th>mAP50</th><td>0.34698</td></tr>
+      <tr><th>mAP50–95</th><td>0.22623</td></tr>
+      <tr><th>GPU inference timing</th><td>12.40 ms/image in the recorded GTX 1650 Max-Q environment; not a browser or general hardware benchmark</td></tr>
+    </tbody></table>
+    <p>These results describe one experimental COCO split and one environment. They do not guarantee performance on arbitrary real-world images. Small, occluded, blurry or out-of-distribution objects may be missed or misclassified.</p>
+    <h2>Checkpoint provenance</h2>
+    <table><tbody>
+      <tr><th>Base checkpoint</th><td><code>yolo11n.pt</code> · 5,613,764 bytes · SHA-256 <code>0EBBC80D4A7680D14987A577CD21342B65ECFD94632BD9A8DA63AE6417644EE1</code></td></tr>
+      <tr><th>Base metadata</th><td>Ultralytics 8.2.100 · embedded date 2024-09-25 · AGPL-3.0 · 80 detection classes</td></tr>
+      <tr><th>Base source record</th><td>The official Ultralytics Assets <code>v8.3.0</code> YOLO11 release is the source candidate. The corresponding asset URL is <a href="https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11n.pt">yolo11n.pt</a>. The original download event and upstream checksum were not retained; the URL has not been cryptographically matched to the local file.</td></tr>
+      <tr><th>Fine-tuned checkpoint</th><td><code>models/trained/best_coco2017_expanded_epoch1.pt</code> · SHA-256 <code>7F86F3C51175909911BBA7B8E2F8C0A586423212D46298474FE04A43FEE9464A</code></td></tr>
+      <tr><th>ONNX artifact</th><td><code>models/exported/best.onnx</code> · SHA-256 <code>A5A4DDB5BA611B69272EA930E1C67A0B1121DB02568881A33D257F279B8AFC57</code></td></tr>
+    </tbody></table>
+    <h2>Data and licensing limitations</h2>
+    <p>The training experiment used COCO-derived images and annotations. COCO annotation licensing does not grant rights to the underlying Flickr-hosted photographs. The public source and demo do not include COCO photographs or annotation payloads. Dataset users must independently obtain the data and comply with the rights applicable to each image. See <a href="./DATASETS.md">dataset provenance</a> and <a href="./COCO-ATTRIBUTION.md">COCO attribution</a>.</p>
+    <p>Ultralytics states that its YOLO code, models and trained models are offered under AGPL-3.0 or a separate Enterprise license. Publishing the project source under AGPL does not by itself resolve every third-party notice, dataset-rights or Corresponding Source question. Review the full license texts and distribution obligations before redistribution or commercial use. This page is informational and is not legal advice.</p>
+    <a class="back" href="./index.html">← Back to VisionLab</a>
+  </main>
+</body>
+</html>

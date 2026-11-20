@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="description" content="VisionLab is an open-source YOLO11 object detection workbench. Try the trained model directly in your browser.">
+  <title>VisionLab — Object Detection Lab</title>
+  <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./assets/site.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.2/dist/ort.wasm.min.js"></script>
+  <script defer src="./assets/app.js"></script>
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+  <header class="topbar shell">
+    <a class="brand" href="#top" aria-label="VisionLab home">
+      <span class="brand-mark"><span></span><span></span><span></span><span></span></span>
+      <span>Vision<span class="brand-accent">Lab</span></span>
+    </a>
+    <nav aria-label="Main navigation">
+      <a href="#demo">Live demo</a>
+      <a href="#about">About</a>
+      <a href="#model">Model card</a>
+    </nav>
+    <a class="nav-cta" href="./LICENSE">AGPL-3.0 <span aria-hidden="true">↗</span></a>
+  </header>
+
+  <main id="top">
+    <section class="hero shell">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="pulse-dot"></span> OPEN-SOURCE COMPUTER VISION</div>
+        <h1>See the world<br>through <span>AI.</span></h1>
+        <p class="hero-lede">An experimental object detection workbench powered by YOLO11. Upload an image and run the model right here in your browser.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#demo">Try the live demo <span aria-hidden="true">↓</span></a>
+          <a class="text-link" href="#about">Explore the project <span aria-hidden="true">→</span></a>
+        </div>
+        <div class="hero-facts">
+          <div><strong>80</strong><span>COCO classes</span></div>
+          <div><strong>640×640</strong><span>Model input</span></div>
+          <div><strong>100%</strong><span>Local inference</span></div>
+        </div>
+      </div>
+      <div class="hero-art" aria-label="Abstract object detection illustration">
+        <div class="art-grid"></div>
+        <div class="scan-line"></div>
+        <div class="object-frame frame-car"><span class="frame-label">car · 0.94</span><div class="car-shape"><i></i><b></b></div></div>
+        <div class="object-frame frame-person"><span class="frame-label">person · 0.89</span><div class="person-shape"><i></i><b></b></div></div>
+        <div class="art-coordinates">YOLO11 / DETECTION<br>640 × 640 PX</div>
+        <div class="art-corner corner-a"></div><div class="art-corner corner-b"></div>
+      </div>
+    </section>
+
+    <section id="demo" class="demo-section shell">
+      <div class="section-heading">
+        <div><div class="eyebrow">INTERACTIVE PLAYGROUND</div><h2>Try object detection</h2></div>
+        <div class="runtime-pill"><span class="runtime-dot"></span><span id="runtime-label">Browser runtime · not loaded</span></div>
+      </div>
+      <div class="demo-card">
+        <div class="demo-toolbar">
+          <div class="demo-step"><span>01</span> INPUT IMAGE</div>
+          <div class="toolbar-hint">JPG, PNG or WEBP · up to 12 MB</div>
+        </div>
+        <div class="demo-workspace">
+          <div class="upload-panel" id="drop-zone">
+            <input id="image-input" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+            <div class="upload-content" id="upload-prompt">
+              <div class="upload-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 16.5v2A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5v-2"/></svg></div>
+              <h3>Drop an image here</h3>
+              <p>or <button class="inline-button" id="browse-button" type="button">browse files</button> from your device</p>
+              <span class="upload-note">Your image stays on your device</span>
+            </div>
+            <div class="preview-wrap" id="preview-wrap" hidden>
+              <canvas id="result-canvas" aria-label="Image with object detection boxes"></canvas>
+              <button id="remove-image" class="remove-image" type="button" aria-label="Remove image">×</button>
+            </div>
+          </div>
+          <aside class="control-panel">
+            <div class="demo-step"><span>02</span> MODEL SETTINGS</div>
+            <div class="model-status">
+              <div class="model-icon">VL</div>
+              <div><strong>VisionLab YOLO11n</strong><small>Custom COCO-trained checkpoint</small></div>
+              <span class="status-indicator" id="model-indicator" title="Model not loaded"></span>
+            </div>
+            <div class="setting-block">
+              <div class="setting-label"><label for="confidence">Confidence threshold</label><output id="confidence-value">0.25</output></div>
+              <input id="confidence" type="range" min="0.05" max="0.95" step="0.05" value="0.25">
+              <div class="range-ends"><span>More detections</span><span>Higher certainty</span></div>
+            </div>
+            <div class="setting-block">
+              <div class="setting-label"><label for="iou">NMS IoU threshold</label><output id="iou-value">0.45</output></div>
+              <input id="iou" type="range" min="0.10" max="0.90" step="0.05" value="0.45">
+              <div class="range-ends"><span>Less overlap</span><span>More overlap</span></div>
+            </div>
+            <div class="model-actions">
+              <button class="button button-secondary" id="load-model" type="button">Load model <span aria-hidden="true">↗</span></button>
+              <button class="button button-primary button-detect" id="run-detection" type="button" disabled>Run detection <span aria-hidden="true">→</span></button>
+            </div>
+            <p class="status-message" id="status-message" role="status" aria-live="polite">Load the model to get started. The first load downloads approximately 10.7 MB.</p>
+          </aside>
+        </div>
+        <div class="results-bar">
+          <div class="demo-step"><span>03</span> DETECTION RESULTS</div>
+          <div class="result-summary" id="result-summary">Waiting for an image</div>
+        </div>
+        <div class="results-content" id="results-content"><div class="empty-results">Detected objects and confidence scores will appear here.</div></div>
+      </div>
+      <p class="privacy-note"><span aria-hidden="true">◈</span> <strong>Private by design.</strong> Image preprocessing and inference run locally in your browser using WebAssembly. Images are not uploaded to a server.</p>
+    </section>
+
+    <section id="about" class="about-section shell">
+      <div class="section-heading"><div><div class="eyebrow">THE PROJECT</div><h2>Built to learn. Made to explore.</h2></div></div>
+      <div class="about-grid">
+        <article class="about-card about-main"><div class="card-number">01 / RESEARCH</div><div class="about-symbol">⌘</div><h3>A practical computer vision lab</h3><p>VisionLab brings model training, evaluation, hyperparameter optimization and inference together in one reproducible project. Python powers the research workflow; .NET provides a separate ONNX inference application.</p><a href="#model" class="card-link">Explore the model <span>→</span></a></article>
+        <article class="about-card"><div class="card-number">02 / PIPELINE</div><div class="pipeline"><span>DATA</span><i>→</i><span>YOLO11</span><i>→</i><span>ONNX</span><i>→</i><span>INFERENCE</span></div><h3>One model, multiple runtimes</h3><p>Train and evaluate with Ultralytics, export a fixed-shape ONNX model, then run it with ONNX Runtime in .NET or directly in this browser demo.</p></article>
+        <article class="about-card"><div class="card-number">03 / TRANSPARENCY</div><div class="metric-pair"><div><strong>0.347</strong><small>mAP50</small></div><div><strong>0.226</strong><small>mAP50–95</small></div></div><h3>Honest about performance</h3><p>These are results from a 5,000-image COCO test split in one experiment, not a promise of real-world accuracy. Small, occluded and unfamiliar objects may be missed.</p></article>
+      </div>
+    </section>
+
+    <section id="model" class="model-section shell">
+      <div class="model-copy"><div class="eyebrow">MODEL CARD</div><h2>YOLO11n<br><span>Object Detection</span></h2><p>A compact, 80-class detector fine-tuned for an educational experiment on COCO-derived data. Training was intentionally limited; the model is a learning artifact, not a production or safety-critical system.</p><div class="model-tags"><span>YOLO11n</span><span>ONNX · Opset 17</span><span>AGPL-3.0</span></div></div>
+      <div class="spec-card"><div class="spec-row"><span>Architecture</span><strong>YOLO11n</strong></div><div class="spec-row"><span>Task</span><strong>Object detection · 80 classes</strong></div><div class="spec-row"><span>Input tensor</span><strong>1 × 3 × 640 × 640</strong></div><div class="spec-row"><span>Output tensor</span><strong>1 × 84 × 8400</strong></div><div class="spec-row"><span>Training budget</span><strong>10 epochs · stopped early</strong></div><div class="spec-row"><span>Test mAP50–95</span><strong>0.22623</strong></div><div class="spec-row"><span>License</span><strong>AGPL-3.0 · see notices</strong></div><a class="spec-link" href="./model-card.html">Read full model card <span>↗</span></a></div>
+    </section>
+  </main>
+
+  <footer class="footer shell"><a class="brand" href="#top"><span class="brand-mark"><span></span><span></span><span></span><span></span></span><span>Vision<span class="brand-accent">Lab</span></span></a><p>Made for learning, experimentation and open-source computer vision.</p><span class="footer-license">AGPL-3.0 · YOLO11</span></footer>
+</body>
+</html>
