@@ -61,6 +61,7 @@ def detect_video(source: str | int, model_path: str | None = None, conf: float =
     processed_frames = 0
 
     def set_source_fps(fps: float) -> None:
+        """Keep the capture's valid FPS for initializing the output video writer."""
         nonlocal source_fps
         if math.isfinite(fps) and fps > 0:
             source_fps = fps

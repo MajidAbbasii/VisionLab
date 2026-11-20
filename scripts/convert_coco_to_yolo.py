@@ -14,6 +14,12 @@ from typing import Any
 
 
 def convert(coco_root: Path, classes_file: Path, overwrite: bool = False) -> dict[str, Any]:
+    """Convert COCO validation annotations into normalized YOLO label files.
+
+    Category IDs are translated through class names, crowd annotations are
+    excluded, and existing non-empty labels are protected unless overwrite is
+    explicitly requested.
+    """
     annotation_file = coco_root / "annotations" / "instances_val2017.json"
     image_dir = coco_root / "images" / "val2017"
     label_dir = coco_root / "labels" / "val2017"
@@ -25,6 +31,8 @@ def convert(coco_root: Path, classes_file: Path, overwrite: bool = False) -> dic
         raise ValueError(f"Expected exactly 80 class names, found {len(class_names)}")
 
     data = json.loads(annotation_file.read_text(encoding="utf-8"))
+    # COCO category IDs are not guaranteed to be contiguous or ordered like the
+    # model's class indices, so map through the canonical classes file by name.
     category_by_name = {item["name"]: int(item["id"]) for item in data["categories"]}
     missing = sorted(set(class_names) - set(category_by_name))
     if missing:
@@ -41,6 +49,8 @@ def convert(coco_root: Path, classes_file: Path, overwrite: bool = False) -> dic
     skipped_invalid = 0
     class_counts: Counter[int] = Counter()
 
+    # Convert COCO [x, y, width, height] pixel boxes into YOLO normalized
+    # [center_x, center_y, width, height] coordinates for each image.
     for annotation in data["annotations"]:
         if int(annotation.get("iscrowd", 0)) == 1:
             skipped_crowd += 1
@@ -98,6 +108,7 @@ def convert(coco_root: Path, classes_file: Path, overwrite: bool = False) -> dic
 
 
 def main() -> None:
+    """Parse conversion options and report the COCO-to-YOLO dataset conversion summary."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--coco-root", type=Path, default=Path("datasets/coco2017"))
     parser.add_argument("--classes", type=Path, default=Path("datasets/classes.txt"))

@@ -4,6 +4,7 @@ using OpenCvSharp;
 using VisionLab.Core.Detection;
 using VisionLab.Core.Video;
 
+// Print the supported CLI commands and their optional arguments.
 static void Usage()
 {
     Console.WriteLine("VisionLab .NET 8 ONNX inference");
@@ -22,12 +23,16 @@ if (command is not ("image" or "video"))
     return;
 }
 
+// Read an option/value pair from the original argument list; use the supplied
+// default when the option is absent or has no following value.
 string Option(string name, string fallback)
 {
     var index = Array.IndexOf(args, name);
     return index >= 0 && index + 1 < args.Length ? args[index + 1] : fallback;
 }
 
+// Parse numeric thresholds with invariant culture so CLI behavior does not
+// depend on the machine's regional decimal separator.
 float Threshold(string name, float fallback)
 {
     var raw = Option(name, fallback.ToString(System.Globalization.CultureInfo.InvariantCulture));
@@ -98,10 +103,13 @@ else if (command == "video")
 }
 else Usage();
 
+// Keep folder processing limited to formats OpenCV can commonly decode here.
 static bool IsSupportedImage(string path) =>
     new[] { ".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp" }
         .Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
 
+// Run inference for one image, draw detections, and write both the annotated
+// image and a machine-readable JSON report. Return false for unreadable images.
 static bool ProcessImage(string input, string output, string jsonPath,
     YoloOnnxDetector detector, float confidence, float iou)
 {
@@ -112,6 +120,7 @@ static bool ProcessImage(string input, string output, string jsonPath,
         return false;
     }
 
+    // Measure model inference only; image loading, drawing, and file output are excluded.
     var timer = Stopwatch.StartNew();
     var detections = detector.Predict(image, confidence, iou);
     timer.Stop();
@@ -128,6 +137,8 @@ static bool ProcessImage(string input, string output, string jsonPath,
     Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(jsonPath))!);
     if (!Cv2.ImWrite(output, image)) throw new IOException($"Could not write annotated image: {output}");
 
+    // Store absolute paths and the exact thresholds alongside detections so the
+    // result can be interpreted independently of the process working directory.
     var report = new
     {
         source = Path.GetFullPath(input),

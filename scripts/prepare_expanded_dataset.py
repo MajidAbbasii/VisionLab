@@ -1,3 +1,11 @@
+"""Build a reproducible expanded COCO train/validation dataset with leakage checks.
+
+The script reuses the original COCO128 training images, selects additional
+images from COCO train2017, excludes the reserved independent-test sample and
+the previously used official validation split, then downloads and validates
+the selected files and generated YOLO labels. Its manifest makes interrupted
+downloads resumable without changing the selected split.
+"""
 from __future__ import annotations
 
 import concurrent.futures
@@ -31,6 +39,7 @@ TRAIN_LABEL_DIR = ROOT / 'labels' / 'train2017'
 VAL_LABEL_DIR = ROOT / 'labels' / 'val2017'
 ANNOTATION_DIR = ROOT / 'annotations'
 
+# Prepare output locations before validating inputs so reruns can reuse cached files.
 for directory in (TRAIN_IMAGE_DIR, VAL_IMAGE_DIR, TRAIN_LABEL_DIR, VAL_LABEL_DIR, ANNOTATION_DIR):
     directory.mkdir(parents=True, exist_ok=True)
 
@@ -59,7 +68,8 @@ missing_test = sorted(test_names - set(images))
 if missing_existing or missing_test:
     raise RuntimeError(f'Image IDs missing from COCO annotations: train={missing_existing[:5]}, test={missing_test[:5]}')
 
-# Exclude the previously-used official validation set as well as the untouched test set.
+# Keep all three partitions disjoint: preserve existing training data, reserve
+# the independent test manifest, and avoid reusing the historical COCO val split.
 official_val_names = {p.name for p in Path('datasets/coco2017/images/val2017').glob('*.jpg')}
 if len(official_val_names) != 5000:
     raise RuntimeError(f'Expected 5000 existing official val2017 images, found {len(official_val_names)}')
@@ -87,8 +97,11 @@ if (train_names | val_names) & official_val_names:
     raise RuntimeError('Previously-used official val2017 images must not enter new splits')
 
 def write_json(path: Path, value: object) -> None:
+    """Write a JSON value as UTF-8 with indentation for reproducible manifests."""
     path.write_text(json.dumps(value, indent=2), encoding='utf-8')
 
+# Persist the exact sampled image IDs before downloading; subsequent runs must
+# reuse this manifest rather than silently drawing a different dataset split.
 selection = {
     'dataset': 'COCO 2017 expanded training and fresh validation',
     'source_split': 'train2017',
@@ -127,6 +140,7 @@ for name in existing_train:
         shutil.copy2(src_img, dst_img)
 
 def download_one(item: dict, image_dir: Path) -> tuple[str, str, int]:
+    """Download one COCO image with retries, cache validation, and JPEG normalization."""
     name = item['file_name']
     target = image_dir / name
     if target.is_file() and target.stat().st_size > 1024:
@@ -166,6 +180,7 @@ def download_one(item: dict, image_dir: Path) -> tuple[str, str, int]:
     return name, f'FAILED: {type(last_error).__name__}: {last_error}', 0
 
 def convert_split(items: list[dict], image_dir: Path, label_dir: Path, split: str) -> dict:
+    """Convert annotations for one selected split into normalized YOLO label files."""
     ids = {int(x['id']) for x in items}
     by_id = {int(x['id']): x for x in items}
     category_by_name = {x['name']: int(x['id']) for x in coco['categories']}
@@ -202,6 +217,8 @@ def convert_split(items: list[dict], image_dir: Path, label_dir: Path, split: st
         label_path.write_text('\n'.join(rows[image_id]) + ('\n' if rows[image_id] else ''), encoding='utf-8')
     return {'images': len(items), 'labels': len(list(label_dir.glob('*.txt'))), 'annotations': sum(counts.values()) + crowd, 'yolo_boxes': sum(counts.values()), 'crowd_skipped': crowd, 'invalid_skipped': invalid, 'classes_with_boxes': len(counts)}
 
+# Download with a bounded in-flight queue so large selections do not allocate
+# thousands of pending Future objects at once. Existing valid files are reused.
 for split, items, image_dir in (('train', train_selected, TRAIN_IMAGE_DIR), ('val', val_selected, VAL_IMAGE_DIR)):
     print(f'Downloading {split}: {len(items)} images...', flush=True)
     failures = []
@@ -251,7 +268,8 @@ for split, items, image_dir in (('train', train_selected, TRAIN_IMAGE_DIR), ('va
     write_json(ANNOTATION_DIR / f'{split}_summary.json', {**stats, 'downloaded_this_run': downloaded, 'cached': cached, 'downloaded_bytes': total_bytes})
     print(f'{split} labels generated: {stats}', flush=True)
 
-# Final integrity audit: all files present, valid JPEGs/YOLO rows, exact split disjointness.
+# Final integrity audit: verify image signatures, label ranges, file presence,
+# and exact filename-level separation before publishing the dataset YAML.
 for split, items, image_dir, label_dir in (
     ('train', train_selected, TRAIN_IMAGE_DIR, TRAIN_LABEL_DIR),
     ('val', val_selected, VAL_IMAGE_DIR, VAL_LABEL_DIR),

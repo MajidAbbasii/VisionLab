@@ -11,9 +11,15 @@ from .experiments.dataset_validation import validate_train_val_separation
 LOGGER = configure_logging(__name__)
 
 def train(config_path: str = "configs/training.yaml", overrides: dict | None = None) -> Path:
-    """Train from YAML settings, then export the best checkpoint and epoch metrics."""
+    """Train from YAML settings and preserve the best checkpoint and epoch metrics.
+
+    Runtime overrides take precedence over values loaded from the YAML file.
+    A train/validation separation preflight runs before model initialization so
+    an invalid split cannot consume GPU time or produce misleading metrics.
+    """
     cfg = load_yaml(config_path)
     cfg.update(overrides or {})
+    # These are project output destinations, not Ultralytics training arguments.
     checkpoint_output = cfg.pop("checkpoint_output", "models/trained/best.pt")
     metrics_output = cfg.pop("metrics_output", "results/metrics/training_metrics.csv")
     split_validation = validate_train_val_separation(project_path(cfg["data"]))
@@ -23,6 +29,8 @@ def train(config_path: str = "configs/training.yaml", overrides: dict | None = N
     # Pass the seed to Ultralytics as well as seeding Python/NumPy/PyTorch above.
     model.train(**{k: v for k, v in cfg.items() if k != "model"})
     # Ultralytics returns metrics; its trainer owns the actual run directory.
+    # Use the trainer's actual run directory because Ultralytics may create a
+    # numbered run folder when the configured output name already exists.
     run_dir = Path(model.trainer.save_dir)
     best = run_dir / "weights" / "best.pt"
     if not best.exists(): raise FileNotFoundError(f"Training checkpoint not found: {best}")

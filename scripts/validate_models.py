@@ -11,6 +11,7 @@ from ultralytics import YOLO
 
 
 def evaluate(model_path: Path, data: Path, name: str, device: str, batch: int) -> dict[str, Any]:
+    """Evaluate one checkpoint with the shared validation protocol and return metrics."""
     if not model_path.is_file():
         raise FileNotFoundError(model_path)
 
@@ -47,6 +48,7 @@ def evaluate(model_path: Path, data: Path, name: str, device: str, batch: int) -
 
 
 def main() -> None:
+    """Evaluate the configured baseline and tuned checkpoints and save their comparison."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, default=Path("datasets/coco2017.yaml"))
     parser.add_argument("--device", default="0")

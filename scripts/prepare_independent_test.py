@@ -1,3 +1,9 @@
+﻿"""Create a deterministic, held-out COCO test sample with verified labels.
+
+The sample is drawn from COCO train2017 while excluding the project's existing
+training and validation images. The selection manifest and checksums preserve
+provenance; rerunning the script reuses valid downloads and retries failures.
+"""
 from __future__ import annotations
 
 import concurrent.futures
@@ -39,6 +45,8 @@ missing_train = sorted(train_names - set(images_by_name))
 if missing_train:
     raise RuntimeError(f'{len(missing_train)} COCO128 train images missing from COCO train annotations: {missing_train[:5]}')
 
+# Reserve this sample before expanded training/validation selection. Excluding
+# both known splits prevents image-level leakage into the independent test set.
 eligible = [item for item in coco['images'] if item['file_name'] not in train_names and item['file_name'] not in val_names]
 if len(eligible) < SAMPLE_SIZE:
     raise RuntimeError(f'Only {len(eligible)} eligible images; need {SAMPLE_SIZE}')
@@ -51,7 +59,8 @@ if selected_names & train_names or selected_names & val_names:
 
 print(f'Selected {len(selected)} images; excluding {len(train_names)} COCO128 train images; seed={SEED}', flush=True)
 
-# Persist the exact selection before downloading so an interrupted run is resumable.
+# Persist the exact image IDs and URLs before downloading so an interrupted run
+# resumes the same sample instead of selecting a different test population.
 manifest = {
     'dataset': 'COCO 2017 train images held out as independent test',
     'split': 'test2017',
@@ -66,6 +75,7 @@ manifest = {
 
 
 def download_one(item):
+    """Download and validate one selected JPEG, retrying transient failures."""
     name = item['file_name']
     target = image_dir / name
     if target.is_file() and target.stat().st_size > 1024:
@@ -124,7 +134,8 @@ if failed:
     (annotation_dir / 'download_failures.json').write_text(json.dumps(failed, indent=2), encoding='utf-8')
     raise RuntimeError(f'{len(failed)} image downloads failed; rerun script to resume')
 
-# Convert only annotations belonging to the selected image IDs.
+# Convert only annotations belonging to the selected image IDs. Category IDs
+# are translated through class names because COCO IDs are not model class indices.
 category_by_name = {item['name']: int(item['id']) for item in coco['categories']}
 missing_classes = sorted(set(class_names) - set(category_by_name))
 if missing_classes:
@@ -185,7 +196,8 @@ yaml = (
 )
 Path('datasets/coco2017_independent_test.yaml').write_text(yaml, encoding='utf-8')
 
-# Verify files, split separation, label syntax, and produce per-image checksums.
+# Verify image signatures, label syntax/ranges, and split separation; then
+# produce per-image SHA-256 checksums to identify the exact downloaded sample.
 missing_images = []
 missing_labels = []
 invalid_labels = []

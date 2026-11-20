@@ -24,6 +24,7 @@ METRIC_TOKEN = "map50-95"
 
 
 def _sha256(path: Path) -> str | None:
+    """Return a file's SHA-256 digest, or None when the path is not a file."""
     if not path.is_file():
         return None
     digest = hashlib.sha256()
@@ -43,6 +44,7 @@ def _legacy_config_fingerprint(cfg: dict[str, Any]) -> str:
 
 
 def _config_fingerprint(cfg: dict[str, Any]) -> str:
+    """Hash training and search settings to prevent incompatible study resumes."""
     relevant = {key: value for key, value in cfg.items() if key != "tuning"}
     relevant["search_space"] = cfg["tuning"]["search_space"]
     relevant["direction"] = cfg["tuning"].get("direction", "maximize")
@@ -53,6 +55,7 @@ def _config_fingerprint(cfg: dict[str, Any]) -> str:
 
 
 def _environment_metadata(cfg: dict[str, Any]) -> dict[str, Any]:
+    """Capture runtime, package, accelerator, dataset, and training provenance."""
     packages = {}
     for package in ("ultralytics", "torch", "optuna", "numpy", "pandas"):
         try:
@@ -95,6 +98,7 @@ def _environment_metadata(cfg: dict[str, Any]) -> dict[str, Any]:
 
 
 def _read_best_score(run_dir: Path) -> float:
+    """Read the highest mAP50-95 value from an Ultralytics run's results.csv."""
     results_file = run_dir / "results.csv"
     if not results_file.is_file():
         raise FileNotFoundError(f"Ultralytics results.csv not found: {results_file}")
@@ -130,6 +134,7 @@ def _validation_map50_95(metrics: dict[str, Any]) -> float | None:
 def _make_pruning_callback(trial: optuna.Trial, total_epochs: int):
     """Report each completed validation epoch and stop unpromising trials."""
     def on_fit_epoch_end(trainer: Any) -> None:
+        """Report completed validation scores and prune weak trials when eligible."""
         epoch = int(getattr(trainer, "epoch", -1)) + 1
         # Do not prune on the final epoch: the trial has already paid the full cost.
         if epoch < 1 or epoch >= total_epochs:
@@ -154,6 +159,7 @@ def _make_pruning_callback(trial: optuna.Trial, total_epochs: int):
 
 
 def _trial_records(study: optuna.Study) -> list[dict[str, Any]]:
+    """Flatten Optuna trial state, timing, parameters, and metadata for CSV export."""
     records = []
     for trial in study.trials:
         duration = trial.duration.total_seconds() if trial.duration else None
@@ -174,6 +180,7 @@ def _trial_records(study: optuna.Study) -> list[dict[str, Any]]:
 
 
 def _export_artifacts(study: optuna.Study, cfg: dict[str, Any], db_path: Path) -> dict[str, Any]:
+    """Persist trial tables, best checkpoint, provenance, summary JSON, and plots."""
     study_name = study.study_name
     safe_name = "".join(char if char.isalnum() or char in "-_" else "_" for char in study_name)
 
@@ -246,6 +253,13 @@ def run_tuning(
     overrides: dict[str, Any] | None = None,
     study_name_override: str | None = None,
 ) -> dict[str, Any]:
+    """Run or resume a reproducible Optuna study for YOLO training.
+
+    The study is bound to a fingerprint of its dataset and search/training
+    configuration. Existing compatible studies can resume; incompatible
+    configurations must use a different study name. Each trial trains a fresh
+    model, records its run metadata, and returns its best validation mAP50-95.
+    """
     cfg = load_yaml(config_path)
     cfg.update(overrides or {})
     tuning = cfg["tuning"]
@@ -342,6 +356,7 @@ def run_tuning(
         })
 
     def objective(trial: optuna.Trial) -> float:
+        """Train one sampled configuration and return its best validation score."""
         params = {
             "lrf": trial.suggest_float("lrf", *ranges["lrf"], log=True),
             "weight_decay": trial.suggest_float("weight_decay", *ranges["weight_decay"], log=True),

@@ -38,11 +38,13 @@
   let videoRecorder = null;
   let videoStopRequested = false;
 
+  /** Update the primary model/image workflow status message. */
   function setStatus(message, kind = '') {
     elements.status.textContent = message;
     elements.status.className = `status-message ${kind}`.trim();
   }
 
+  /** Synchronize image, video, and camera controls with the current busy state. */
   function setBusy(value) {
     busy = value;
     elements.load.disabled = value || Boolean(session);
@@ -55,6 +57,7 @@
     elements.startCamera.disabled = value || !session || Boolean(cameraStream) || cameraStarting || videoProcessing;
   }
 
+  /** Round half-way values to the nearest even integer to match preprocessing runtimes. */
   function roundToEven(value) {
     const floor = Math.floor(value);
     const fraction = value - floor;
@@ -62,6 +65,7 @@
     return Math.round(value);
   }
 
+  /** Load class labels and initialize the ONNX Runtime Web session on WASM. */
   async function loadModel() {
     if (session || busy) return;
     if (!window.ort) {
@@ -101,6 +105,7 @@
     }
   }
 
+  /** Validate a selected image and retain a local object URL for preview and inference. */
   function loadImage(file) {
     if (!file || busy || mediaBusy || cameraStarting || cameraStream) return;
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
@@ -137,6 +142,7 @@
     image.src = url;
   }
 
+  /** Draw the source image and its detection boxes on the image-result canvas. */
   function drawImage(items) {
     if (!sourceImage) return;
     const image = sourceImage.image;
@@ -164,6 +170,7 @@
     });
   }
 
+  /** Render the detection count and confidence-sorted class results in the page. */
   function renderResults(items, completed = true) {
     elements.summary.textContent = items.length ? `${items.length} object${items.length === 1 ? '' : 's'} detected` : completed ? '0 objects detected' : 'No detections yet';
     if (!items.length) {
@@ -176,11 +183,14 @@
     }).join('')}</div>`;
   }
 
+  /** Escape untrusted label text before inserting it into an HTML result fragment. */
   function escapeHtml(value) {
     return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
   }
 
   function preprocess(image) {
+    // Match the Python/C# model contract: square letterboxing with a 114 gray
+    // background, RGB channel planes, and float values normalized to [0, 1].
     const dimensions = getMediaSize(image);
     const scale = Math.min(INPUT_SIZE / dimensions.width, INPUT_SIZE / dimensions.height);
     const width = Math.max(1, roundToEven(dimensions.width * scale));
@@ -198,6 +208,7 @@
     context.drawImage(image, left, top, width, height);
     const pixels = context.getImageData(0, 0, INPUT_SIZE, INPUT_SIZE).data;
     const plane = INPUT_SIZE * INPUT_SIZE;
+    // ONNX expects planar NCHW data, while Canvas returns interleaved RGBA bytes.
     const tensorData = new Float32Array(3 * plane);
     for (let i = 0; i < plane; i++) {
       const offset = i * 4;
@@ -208,6 +219,7 @@
     return { tensorData, scale, left, top, imageWidth: dimensions.width, imageHeight: dimensions.height };
   }
 
+  /** Read intrinsic dimensions from either an image, video, or canvas-like source. */
   function getMediaSize(media) {
     return {
       width: media.naturalWidth || media.videoWidth || media.width,
@@ -216,6 +228,8 @@
   }
 
   function intersectionOverUnion(a, b) {
+    // Compute intersection-over-union for two corner-coordinate boxes; the
+    // epsilon protects against division by zero for degenerate rectangles.
     const left = Math.max(a.x1, b.x1);
     const top = Math.max(a.y1, b.y1);
     const right = Math.min(a.x2, b.x2);
@@ -226,9 +240,12 @@
     return intersection / Math.max(1e-8, areaA + areaB - intersection);
   }
 
+  /** Decode raw YOLO output, restore source coordinates, and apply class-aware NMS. */
   function postprocess(output, transform, confidence, iou) {
     const dims = output.dims;
     if (dims.length !== 3) throw new Error(`Expected rank-3 YOLO output, received [${dims.join(', ')}].`);
+    // Support both [1, features, candidates] and [1, candidates, features]
+    // raw YOLO exports, matching the layout detection used by the .NET runner.
     const channelFirst = dims[1] <= dims[2] && dims[1] >= 5;
     const featureCount = channelFirst ? dims[1] : dims[2];
     const candidateCount = channelFirst ? dims[2] : dims[1];
@@ -237,6 +254,8 @@
     const read = (candidate, feature) => channelFirst
       ? output.data[feature * candidateCount + candidate]
       : output.data[candidate * featureCount + feature];
+    // Raw YOLO output stores box center/size followed by class scores; group
+    // candidates by their highest-scoring class before applying class-aware NMS.
     const byClass = new Map();
     for (let i = 0; i < candidateCount; i++) {
       let classId = 0;
@@ -246,6 +265,7 @@
         if (candidateScore > score) { score = candidateScore; classId = c; }
       }
       if (score < confidence) continue;
+      // Undo the letterbox offset and scale so boxes use original media pixels.
       const cx = (read(i, 0) - transform.left) / transform.scale;
       const cy = (read(i, 1) - transform.top) / transform.scale;
       const width = read(i, 2) / transform.scale;
@@ -260,6 +280,8 @@
       if (!byClass.has(classId)) byClass.set(classId, []);
       byClass.get(classId).push(box);
     }
+    // Greedy NMS: retain the highest score in each class and discard boxes whose
+    // overlap with it exceeds the configured IoU threshold.
     const kept = [];
     for (const candidates of byClass.values()) {
       candidates.sort((a, b) => b.score - a.score);
@@ -282,6 +304,7 @@
     return kept.sort((a, b) => b.score - a.score).slice(0, 300);
   }
 
+  /** Run inference for the selected image and refresh its visual and numeric results. */
   async function runDetection() {
     if (!session || !sourceImage || busy || mediaBusy || videoProcessing || cameraStarting || cameraStream) return;
     setBusy(true);
@@ -301,6 +324,7 @@
     }
   }
 
+  /** Convert media pixels to the model tensor, execute ONNX, and decode its detections. */
   async function infer(media) {
     const transform = preprocess(media);
     const tensor = new window.ort.Tensor('float32', transform.tensorData, [1, 3, INPUT_SIZE, INPUT_SIZE]);
@@ -308,6 +332,7 @@
     return postprocess(outputs[session.outputNames[0]], transform, Number(elements.confidence.value), Number(elements.iou.value));
   }
 
+  /** Draw detection boxes over a video or camera frame using source-media coordinates. */
   function drawMedia(canvas, media, items) {
     const size = getMediaSize(media);
     if (!size.width || !size.height) return;
@@ -333,7 +358,10 @@
     });
   }
 
+  /** Update per-frame object, class, confidence, latency, FPS, and class-distribution metrics. */
   function updateAnalytics(items, elapsed, fps, frames, source) {
+    // Metrics describe the latest processed frame; class distribution counts
+    // detections in that frame (video processing separately accumulates totals).
     const classes = new Set(items.map(item => item.classId));
     const average = items.length ? items.reduce((sum, item) => sum + item.score, 0) / items.length : 0;
     elements.metricCount.textContent = String(items.length);
@@ -350,11 +378,13 @@
       : '<span class="empty-results">No objects detected in the latest frame.</span>';
   }
 
+  /** Set the status text and visual state for a video or camera workflow. */
   function setMediaStatus(element, message, kind = '') {
     element.textContent = message;
     element.className = `status-message ${kind}`.trim();
   }
 
+  /** Validate a local video file, create its preview URL, and enforce demo limits. */
   function loadVideo(file) {
     if (!file || mediaBusy) return;
     if (!['video/mp4', 'video/webm', 'video/ogg'].includes(file.type)) {
@@ -365,6 +395,8 @@
       setMediaStatus(elements.videoStatus, 'This video is larger than 100 MB. Choose a smaller file.', 'error');
       return;
     }
+    // Use a local object URL so the selected video is decoded by the browser
+    // without uploading its contents to a server.
     const url = URL.createObjectURL(file);
     elements.video.pause();
     if (elements.video.src.startsWith('blob:')) URL.revokeObjectURL(elements.video.src);
@@ -398,10 +430,12 @@
     };
   }
 
+  /** Resolve when MediaRecorder has emitted its stop event. */
   function waitForRecorder(recorder) {
     return new Promise(resolve => recorder.addEventListener('stop', resolve, { once: true }));
   }
 
+  /** Process available video frames sequentially and optionally record annotated output. */
   async function processVideo() {
     if (!session || !elements.video.src || mediaBusy || cameraStarting || cameraStream || videoProcessing) return;
     mediaBusy = true;
@@ -426,8 +460,12 @@
     try {
       elements.video.hidden = true;
       canvas.hidden = false;
+      // Record the annotated canvas, not the source video. This export contains
+      // processed video frames only; the source audio track is not muxed in.
       if (canvas.captureStream && window.MediaRecorder) {
         stream = canvas.captureStream(0);
+        // Prefer explicit frame capture for one output frame per inference result.
+        // Fall back to a timed capture stream on browsers without requestFrame().
         if (!stream.getVideoTracks()[0]?.requestFrame) {
           stream.getTracks().forEach(track => track.stop());
           stream = canvas.captureStream(24);
@@ -447,6 +485,8 @@
       await elements.video.play();
       processingStarted = performance.now();
       setMediaStatus(elements.videoStatus, 'Processing video frames locally…');
+      // Advance with the browser's playback clock, then infer and draw each frame
+      // that is available to this loop. Processing may run slower than source FPS.
       while (!elements.video.ended && !videoStopRequested) {
         await new Promise(resolve => requestAnimationFrame(resolve));
         if (elements.video.paused || !elements.video.videoWidth) continue;
@@ -472,6 +512,8 @@
       if (recorderDone) await recorderDone.catch(() => {});
       setMediaStatus(elements.videoStatus, error.message || 'Video processing failed.', 'error');
     } finally {
+      // Always stop the recorder stream and restore controls, including on errors
+      // or when the user requests an early stop.
       stream?.getTracks().forEach(track => track.stop());
       videoRecorder = null;
       mediaBusy = false;
@@ -487,6 +529,7 @@
     }
   }
 
+  /** Request camera permission and start serialized, local webcam inference. */
   async function startCamera() {
     if (!session || cameraStream || cameraStarting || mediaBusy || videoProcessing) return;
     cameraStarting = true;
@@ -527,6 +570,9 @@
       elements.browse.disabled = true;
       elements.remove.disabled = true;
       setMediaStatus(elements.cameraStatus, 'Camera is running. Frames are processed locally.', 'success');
+      // Schedule the next frame only after the current inference finishes; this
+      // prevents concurrent ONNX runs from building up when inference is slower
+      // than the camera's native frame rate.
       const cameraStarted = performance.now();
       const tick = async () => {
         if (!cameraStream) return;
@@ -564,7 +610,10 @@
     }
   }
 
+  /** Stop all camera tracks and restore the controls to their idle state. */
   function stopCamera() {
+    // Stop every media track to release the physical camera, then detach the
+    // stream from the video element so the device indicator can turn off.
     cameraStarting = false;
     cameraStream?.getTracks().forEach(track => track.stop());
     cameraStream = null;
@@ -584,6 +633,7 @@
     setMediaStatus(elements.cameraStatus, 'Camera stopped.');
   }
 
+  /** Release the selected image URL and reset image detections and result controls. */
   function clearImage() {
     if (busy || mediaBusy || videoProcessing || cameraStarting || cameraStream) return;
     if (sourceImage?.url) URL.revokeObjectURL(sourceImage.url);

@@ -4,6 +4,7 @@ import visionlab.train as train_module
 
 
 def test_train_passes_seed_to_ultralytics_and_exports_artifacts(monkeypatch, tmp_path):
+    """Training forwards reproducibility settings and copies checkpoint/metrics outputs."""
     run_dir = tmp_path / "experiments" / "training" / "run1"
     (run_dir / "weights").mkdir(parents=True)
     (run_dir / "weights" / "best.pt").write_bytes(b"test-checkpoint")
@@ -11,6 +12,8 @@ def test_train_passes_seed_to_ultralytics_and_exports_artifacts(monkeypatch, tmp
         run_dir / "results.csv", index=False
     )
 
+    # Replace Ultralytics with a deterministic fake so this unit test verifies
+    # orchestration and artifact handling without starting a real training run.
     class FakeModel:
         def __init__(self, model_name):
             self.model_name = model_name

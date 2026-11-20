@@ -44,6 +44,8 @@ def test_config_fingerprint_is_stable_and_includes_search_space():
 
 
 def test_legacy_config_fingerprint_excludes_sampler_and_pruner():
+    # Older persisted studies did not fingerprint optimizer settings; they
+    # must remain resumable under the legacy hash while new studies track them.
     config = {
         "model": "yolo11n.pt",
         "data": "datasets/coco128.yaml",
@@ -109,6 +111,8 @@ def test_pruning_callback_reports_score_and_prunes_trial():
             self.user_attrs[key] = value
 
     trial = FakeTrial()
+    # Trainer epochs are zero-based, while the callback reports human-readable
+    # completed-epoch numbers to Optuna starting at one.
     callback = _make_pruning_callback(trial, total_epochs=50)
     trainer = SimpleNamespace(epoch=14, metrics={"metrics/mAP50-95(B)": 0.42})
 
@@ -121,6 +125,8 @@ def test_pruning_callback_reports_score_and_prunes_trial():
 
 
 def test_pruning_callback_does_not_prune_on_final_epoch():
+    # The final epoch is never pruned because its full training cost has already
+    # been paid and the completed trial should retain its final validation score.
     class FakeTrial:
         def report(self, value, step):
             raise AssertionError("Final epoch must not be reported for pruning")

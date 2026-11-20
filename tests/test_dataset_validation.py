@@ -4,6 +4,7 @@ from visionlab.experiments import dataset_validation
 
 
 def _make_split(tmp_path, train_names, val_names):
+    """Create temporary train/validation folders containing named image fixtures."""
     train = tmp_path / "train"
     val = tmp_path / "val"
     train.mkdir()
@@ -16,6 +17,7 @@ def _make_split(tmp_path, train_names, val_names):
 
 
 def test_validate_train_val_separation_accepts_disjoint_image_names(monkeypatch, tmp_path):
+    """Distinct image names should pass the preflight and return split counts."""
     train, val = _make_split(tmp_path, ["000001.jpg", "000002.jpg"], ["000003.jpg"])
     monkeypatch.setattr(dataset_validation, "check_det_dataset", lambda _: {
         "train": str(train), "val": str(val), "names": {0: "person"}
@@ -31,6 +33,7 @@ def test_validate_train_val_separation_accepts_disjoint_image_names(monkeypatch,
 def test_validate_train_val_separation_rejects_same_filename_in_different_dirs(
     monkeypatch, tmp_path
 ):
+    """Matching stems must be rejected even when train and val use different folders."""
     train, val = _make_split(tmp_path, ["000001.jpg"], ["000001.jpg"])
     monkeypatch.setattr(dataset_validation, "check_det_dataset", lambda _: {
         "train": str(train), "val": str(val), "names": {0: "person"}
@@ -41,6 +44,7 @@ def test_validate_train_val_separation_rejects_same_filename_in_different_dirs(
 
 
 def test_validate_train_val_separation_rejects_empty_split(monkeypatch, tmp_path):
+    """A split that resolves to no image files must fail before training starts."""
     train, val = _make_split(tmp_path, ["000001.jpg"], [])
     monkeypatch.setattr(dataset_validation, "check_det_dataset", lambda _: {
         "train": str(train), "val": str(val), "names": {0: "person"}

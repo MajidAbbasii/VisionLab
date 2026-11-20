@@ -1,3 +1,8 @@
+﻿"""Compare Python and C# detections on the same images using class-aware IoU matching.
+
+The script writes Python reference detections and a JSON parity report. It does
+not retrain or modify either runtime's model or inference implementation.
+"""
 from __future__ import annotations
 import json
 from pathlib import Path
@@ -12,6 +17,7 @@ CONF, IOU = 0.25, 0.45
 
 
 def iou_xyxy(a, b):
+    """Return intersection-over-union for two boxes in [x1, y1, x2, y2] form."""
     x1, y1 = max(a[0], b[0]), max(a[1], b[1])
     x2, y2 = min(a[2], b[2]), min(a[3], b[3])
     inter = max(0.0, x2-x1) * max(0.0, y2-y1)
@@ -22,6 +28,7 @@ def iou_xyxy(a, b):
 
 
 def main():
+    """Run both inference paths on the prepared image batch and save a parity report."""
     OUT.mkdir(parents=True, exist_ok=True)
     images = sorted(p for p in INPUT.iterdir() if p.suffix.lower() in {'.jpg','.jpeg','.png','.bmp','.webp'})
     if not images:
@@ -29,6 +36,8 @@ def main():
     model = YOLO(str(ROOT / 'models/exported/best.onnx'), task='detect')
     results = model.predict(source=[str(p) for p in images], imgsz=640, conf=CONF, iou=IOU,
                             device='cpu', save=False, verbose=False)
+    # Match each Python detection to the best compatible C# detection using
+    # class ID and IoU; this measures runtime parity rather than model accuracy.
     rows = []
     for image, result in zip(images, results):
         with (CSHARP / f'{image.stem}.json').open(encoding='utf-8') as f:

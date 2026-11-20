@@ -6,6 +6,8 @@ namespace VisionLab.Core.Tests;
 
 public sealed class YoloOnnxDetectorIntegrationTests
 {
+    // Locate the checked-in model by walking upward from the test output folder;
+    // this keeps the integration tests independent of the runner's working directory.
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -20,6 +22,8 @@ public sealed class YoloOnnxDetectorIntegrationTests
     }
 
     [Theory]
+    // Cover portrait, landscape, square, and very small inputs to exercise
+    // letterboxing and verify that returned boxes stay inside source dimensions.
     [InlineData(32, 32)]
     [InlineData(320, 240)]
     [InlineData(1920, 480)]

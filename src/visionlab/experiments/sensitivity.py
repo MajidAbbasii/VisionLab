@@ -12,7 +12,12 @@ LOGGER = configure_logging(__name__)
 
 def run_sensitivity(model_path: str | None = None,
                     config_path: str = "configs/experiments.yaml") -> pd.DataFrame:
-    """Measure one-factor-at-a-time inference sensitivity on the configured val split."""
+    """Measure one-factor-at-a-time inference sensitivity on the configured val split.
+
+    Confidence, IoU, and input size are varied independently while the other
+    inference settings remain at their baseline values. The configured
+    train/validation split is checked before any validation run is started.
+    """
     cfg = load_yaml(config_path)
     split_validation = validate_train_val_separation(project_path(cfg["data"]))
     LOGGER.info("Train/validation split preflight passed: %s", split_validation)
@@ -20,6 +25,8 @@ def run_sensitivity(model_path: str | None = None,
     model = YOLO(str(project_path(model_path)))
     study_name = str(cfg.get("tuning", {}).get("study_name", "sensitivity"))
     safe_name = re.sub(r"[^A-Za-z0-9_-]+", "_", study_name)
+    # Build a one-dimensional sweep for each parameter; do not combine values
+    # into a Cartesian grid, which would change multiple factors at once.
     settings = [("conf", v) for v in cfg["sensitivity"]["conf_values"]]
     settings += [("iou", v) for v in cfg["sensitivity"]["iou_values"]]
     settings += [("imgsz", v) for v in cfg["sensitivity"]["imgsz_values"]]
@@ -31,6 +38,7 @@ def run_sensitivity(model_path: str | None = None,
                 "verbose": False, "plots": False,
                 "project": str(project_path(f"results/validation/sensitivity/{safe_name}")),
                 "name": f"{parameter}_{value}", "exist_ok": False}
+        # Override exactly one inference argument for this measurement.
         args[parameter] = value
         metrics = model.val(**args); box = metrics.box
         row = {"parameter": parameter, "value": value, "precision": float(box.mp),

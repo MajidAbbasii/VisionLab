@@ -10,6 +10,8 @@ from .dataset_validation import validate_train_val_separation
 
 LOGGER = configure_logging(__name__)
 VARIANTS = {
+    # Each variant changes only the named augmentation(s), leaving all other
+    # training settings shared so the comparison remains interpretable.
     "baseline": {},
     "no_mosaic": {"mosaic": 0.0},
     "no_mixup": {"mixup": 0.0},
@@ -19,7 +21,12 @@ VARIANTS = {
 }
 
 def run_ablation(config_path: str = "configs/experiments.yaml") -> pd.DataFrame:
-    """Train controlled augmentation variants and compare their best validation scores."""
+    """Train controlled augmentation variants and compare their best validation scores.
+
+    The configured variants are trained independently from the same base model
+    initialization. Scores are taken from each run's best recorded validation
+    epoch rather than comparing only the final epoch.
+    """
     cfg = load_yaml(config_path)
     split_validation = validate_train_val_separation(project_path(cfg["data"]))
     LOGGER.info("Train/validation split preflight passed: %s", split_validation)
@@ -33,6 +40,7 @@ def run_ablation(config_path: str = "configs/experiments.yaml") -> pd.DataFrame:
         model = YOLO(cfg["model"])
         # Merge shared training settings with variant overrides before calling
         # Ultralytics; passing duplicate keyword arguments raises TypeError.
+        # Variant values intentionally override shared augmentation settings.
         train_args = {**cfg.get("train_args", {}), **VARIANTS[variant]}
         metrics = model.train(data=cfg["data"], epochs=int(cfg["epochs"]), imgsz=int(cfg["imgsz"]),
             batch=int(cfg["batch"]), workers=int(cfg["workers"]), seed=int(cfg.get("seed", 42)),
@@ -47,6 +55,7 @@ def run_ablation(config_path: str = "configs/experiments.yaml") -> pd.DataFrame:
                               if "map50-95" in column.lower().replace("_", "-")), None)
         if metric_column is None:
             raise KeyError(f"mAP50-95 column not found in {results_file}")
+        # Ignore malformed/missing CSV values and retain the strongest epoch score.
         score = float(pd.to_numeric(history[metric_column], errors="coerce").max())
         best = Path(model.trainer.save_dir) / "weights" / "best.pt"
         rows.append({"variant": variant, "map50_95": score, "best_checkpoint": str(best),
@@ -54,6 +63,7 @@ def run_ablation(config_path: str = "configs/experiments.yaml") -> pd.DataFrame:
     frame = pd.DataFrame(rows)
     metrics_path = project_path(f"results/metrics/ablation_{safe_name}.csv")
     frame.to_csv(metrics_path, index=False)
+    # Report absolute and relative changes against the baseline variant.
     baseline = float(frame.loc[frame.variant == "baseline", "map50_95"].iloc[0])
     frame["delta_vs_baseline"] = frame.map50_95 - baseline
     frame["delta_percent"] = frame.delta_vs_baseline / baseline * 100 if baseline else 0.0

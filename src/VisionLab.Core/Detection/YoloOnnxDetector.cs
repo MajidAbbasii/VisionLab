@@ -6,8 +6,10 @@ using OpenCvSharp.Dnn;
 namespace VisionLab.Core.Detection;
 
 /// <summary>
-/// YOLOv8/YOLO11 ONNX inference for the common raw detection output [1, 4+classes, candidates]
-/// (or its transposed equivalent). Export with nms=false and a fixed 640x640 input.
+/// Runs YOLOv8/YOLO11 ONNX object detection and converts model output into source-image coordinates.
+/// Supports the raw rank-3 output layouts [1, 4+classes, candidates] and
+/// [1, candidates, 4+classes]. The model should be exported with NMS disabled and
+/// with an input size matching the dimensions supplied to this detector.
 /// </summary>
 public sealed class YoloOnnxDetector : IDisposable
 {
@@ -17,6 +19,15 @@ public sealed class YoloOnnxDetector : IDisposable
     private readonly int _inputWidth;
     private readonly int _inputHeight;
 
+    /// <summary>
+    /// Creates an ONNX Runtime session for the specified YOLO model.
+    /// </summary>
+    /// <param name="modelPath">Path to the ONNX model file.</param>
+    /// <param name="labels">Class labels in the same order used when the model was trained.</param>
+    /// <param name="inputWidth">Model input width in pixels; defaults to 640.</param>
+    /// <param name="inputHeight">Model input height in pixels; defaults to 640.</param>
+    /// <param name="useCuda">Whether to use the ONNX Runtime CUDA execution provider.</param>
+    /// <exception cref="FileNotFoundException">Thrown when the model file does not exist.</exception>
     public YoloOnnxDetector(string modelPath, IReadOnlyList<string> labels,
         int inputWidth = 640, int inputHeight = 640, bool useCuda = false)
     {
@@ -30,6 +41,16 @@ public sealed class YoloOnnxDetector : IDisposable
         _inputName = _session.InputMetadata.Keys.First();
     }
 
+    /// <summary>
+    /// Detects objects in an OpenCV image and returns bounding boxes in the original image's pixel space.
+    /// </summary>
+    /// <param name="image">Source image in OpenCV BGR channel order.</param>
+    /// <param name="confidence">Minimum class confidence required to keep a candidate, in the range [0, 1].</param>
+    /// <param name="iou">IoU threshold used by non-maximum suppression, in the range [0, 1].</param>
+    /// <returns>Detections after confidence filtering and class-aware non-maximum suppression.</returns>
+    /// <exception cref="ArgumentException">Thrown when the source image is empty.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when a threshold is outside [0, 1] or is not finite.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the model output does not have a supported shape.</exception>
     public IReadOnlyList<Detection> Predict(Mat image, float confidence = 0.25f, float iou = 0.45f)
     {
         if (image.Empty()) throw new ArgumentException("Input image is empty", nameof(image));
@@ -38,6 +59,7 @@ public sealed class YoloOnnxDetector : IDisposable
         if (!float.IsFinite(iou) || iou is < 0 or > 1)
             throw new ArgumentOutOfRangeException(nameof(iou), "IoU must be between 0 and 1.");
         // Letterbox instead of stretching: preserve aspect ratio like Ultralytics.
+        // The scale and padding are retained so predicted coordinates can be mapped back later.
         var scale = Math.Min((float)_inputWidth / image.Width, (float)_inputHeight / image.Height);
         var resizedWidth = Math.Max(1, (int)Math.Round(image.Width * scale));
         var resizedHeight = Math.Max(1, (int)Math.Round(image.Height * scale));
@@ -53,7 +75,8 @@ public sealed class YoloOnnxDetector : IDisposable
         using var floatImage = new Mat();
         rgb.ConvertTo(floatImage, MatType.CV_32FC3, 1.0 / 255.0);
 
-        // ONNX tensor layout is NCHW, RGB, normalized to [0,1].
+        // ONNX tensor layout is NCHW, RGB, normalized to [0,1]. OpenCV stores each
+        // pixel as an interleaved Vec3f, so copy the three channels into separate planes.
         var tensor = new DenseTensor<float>(new[] { 1, 3, _inputHeight, _inputWidth });
         for (var y = 0; y < _inputHeight; y++)
         for (var x = 0; x < _inputWidth; x++)
@@ -68,6 +91,8 @@ public sealed class YoloOnnxDetector : IDisposable
         var output = results.First().AsTensor<float>();
         var dims = output.Dimensions.ToArray();
         if (dims.Length != 3) throw new InvalidOperationException($"Expected rank-3 YOLO output, got [{string.Join(',', dims)}]");
+        // YOLO exports commonly use [1, features, candidates]. Some exporters
+        // transpose the last two axes; infer the layout from the smaller feature axis.
         var channelFirst = dims[1] <= dims[2] && dims[1] >= 5;
         var featureCount = channelFirst ? dims[1] : dims[2];
         var candidateCount = channelFirst ? dims[2] : dims[1];
@@ -80,6 +105,8 @@ public sealed class YoloOnnxDetector : IDisposable
         var proposals = new List<(Rect box, int classId, float score)>();
         for (var candidate = 0; candidate < candidateCount; candidate++)
         {
+            // This raw YOLO output contains four box values followed by per-class
+            // scores (no separate objectness value), so select the highest class score.
             var bestClass = 0;
             var bestScore = 0f;
             for (var c = 0; c < classCount; c++)
@@ -88,10 +115,14 @@ public sealed class YoloOnnxDetector : IDisposable
                 if (score > bestScore) { bestScore = score; bestClass = c; }
             }
             if (bestScore < confidence) continue;
+            // Undo letterboxing: remove the left/top padding, then divide by the
+            // resize scale to express the box in the original image coordinate system.
             var cx = (Read(candidate, 0) - padLeft) / scale;
             var cy = (Read(candidate, 1) - padTop) / scale;
             var width = Read(candidate, 2) / scale;
             var height = Read(candidate, 3) / scale;
+            // Convert center-width-height to corner coordinates and clip to the image.
+            // Ensure right/bottom remain at least one pixel beyond left/top for a valid Rect.
             var left = Math.Clamp((int)(cx - width / 2), 0, image.Width - 1);
             var top = Math.Clamp((int)(cy - height / 2), 0, image.Height - 1);
             var right = Math.Clamp((int)(cx + width / 2), left + 1, image.Width);
@@ -99,7 +130,8 @@ public sealed class YoloOnnxDetector : IDisposable
             proposals.Add((new Rect(left, top, right - left, bottom - top), bestClass, bestScore));
         }
 
-        // Class-aware non-maximum suppression.
+        // Run NMS separately for each class so overlapping objects from different
+        // classes do not suppress one another. NMS indices refer to each group's arrays.
         var kept = new List<Detection>();
         foreach (var group in proposals.GroupBy(p => p.classId))
         {
@@ -117,6 +149,7 @@ public sealed class YoloOnnxDetector : IDisposable
         return kept;
     }
 
+    /// <summary>Releases the native resources owned by the ONNX Runtime session.</summary>
     public void Dispose() => _session.Dispose();
 }
 

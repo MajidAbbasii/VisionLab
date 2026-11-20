@@ -5,6 +5,8 @@ from visionlab import detector
 
 
 class FakeCapture:
+    # Minimal VideoCapture substitute that lets tests verify frame iteration and
+    # native-resource cleanup without opening a real camera or video file.
     def __init__(self, source):
         self.source = source
         self.frames = [np.zeros((8, 8, 3), dtype=np.uint8)]
@@ -64,6 +66,8 @@ def test_detect_video_uses_source_fps_and_releases_resources(monkeypatch, tmp_pa
     capture = FakeCapture("sample.mp4")
     writer_state = {}
 
+    # Capture the writer arguments and lifecycle to assert the source FPS is
+    # preserved and both writer and capture are released after processing.
     class FakeWriter:
         def __init__(self, path, codec, fps, size):
             writer_state.update(path=path, codec=codec, fps=fps, size=size, frames=0, released=False)
