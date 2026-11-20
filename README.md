@@ -2,6 +2,8 @@
 
 <p align="center"><strong>Release candidate: v1.0.0-rc1</strong></p>
 
+> **Source-only public snapshot:** ONNX model binaries and pretrained checkpoints, COCO image/label files, experiment databases and generated release artifacts are intentionally excluded pending third-party license review. To run C# inference, export a compatible YOLO detection checkpoint locally and place the resulting file at `models/exported/best.onnx`; see the ONNX export section below.
+
 VisionLab is a modular, reproducible object-detection project. It combines a Python research engine (Ultralytics YOLO + PyTorch + Optuna) with a .NET 8 inference application (ONNX Runtime + OpenCvSharp). It supports image detection, video-file/webcam capture, training, hyperparameter tuning, sensitivity analysis, augmentation ablations, metrics, plots, logs and reports.
 
 **Default model:** YOLO11n. You can select another Ultralytics-compatible checkpoint such as `yolov8n.pt`; support for YOLOv9/YOLOv10 model names depends on the installed Ultralytics release and the model's official integration. The Python engine is the reference implementation for training and research. C# consumes exported ONNX models for deployment.
