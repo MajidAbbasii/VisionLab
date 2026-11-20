@@ -1,0 +1,7 @@
+model: yolo11n.pt
+task: detect
+imgsz: 640
+confidence: 0.25
+iou: 0.45
+device: auto
+

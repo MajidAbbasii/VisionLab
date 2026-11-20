@@ -1,0 +1,17 @@
+# Default reproducible training configuration for the VisionLab baseline.
+model: yolo11n.pt
+data: datasets/coco128.yaml
+epochs: 50
+imgsz: 640
+batch: 4
+workers: 2
+seed: 42
+patience: 20
+pretrained: true
+optimizer: auto
+close_mosaic: 10
+amp: false
+plots: true
+project: experiments/training
+name: baseline_yolo11n_coco128
+exist_ok: false

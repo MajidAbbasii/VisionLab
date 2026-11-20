@@ -1,0 +1,46 @@
+data: datasets/coco128.yaml
+model: yolo11n.pt
+epochs: 50
+imgsz: 640
+batch: 4
+workers: 2
+seed: 42
+train_args:
+  patience: 20
+  pretrained: true
+  optimizer: auto
+  close_mosaic: 10
+  amp: false
+tuning:
+  trials: 20
+  timeout_seconds: null
+  direction: maximize
+  study_name: visionlab_yolo11n_coco128_v2
+  storage: experiments/tuning/optuna.db
+  resume: true
+  sampler:
+    type: tpe
+    seed: 42
+    n_startup_trials: 10
+    n_ei_candidates: 24
+  pruner:
+    type: median
+    n_startup_trials: 5
+    n_warmup_steps: 15
+    interval_steps: 1
+  search_space:
+    lrf: [0.001, 0.1]
+    weight_decay: [0.0001, 0.002]
+    warmup_epochs: [0.0, 5.0]
+    hsv_h: [0.0, 0.08]
+    hsv_s: [0.3, 0.9]
+    hsv_v: [0.2, 0.7]
+    mosaic: [0.5, 1.0]
+    mixup: [0.0, 0.2]
+sensitivity:
+  conf_values: [0.10, 0.20, 0.25, 0.35, 0.50, 0.65]
+  iou_values: [0.30, 0.40, 0.45, 0.50, 0.60, 0.70]
+  imgsz_values: [416, 512, 640, 768]
+ablation:
+  variants: [baseline, no_mosaic, no_mixup, no_fliplr, reduced_augmentation]
+

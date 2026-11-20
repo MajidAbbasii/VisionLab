@@ -1,0 +1,24 @@
+# Final YOLO11n training on the leakage-free expanded COCO2017 split.
+# The independent 5,000-image test set is intentionally not referenced here.
+model: yolo11n.pt
+data: datasets/coco2017_expanded.yaml
+epochs: 100
+imgsz: 640
+batch: 4
+workers: 2
+device: 0
+seed: 20261120
+patience: 25
+pretrained: true
+optimizer: auto
+close_mosaic: 10
+amp: false
+cache: false
+plots: true
+save: true
+save_period: 5
+project: experiments/training
+name: yolo11n_coco2017_expanded_20k
+exist_ok: false
+checkpoint_output: models/trained/best_coco2017_expanded_20k.pt
+metrics_output: results/metrics/training_coco2017_expanded_20k.csv

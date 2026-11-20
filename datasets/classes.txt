@@ -1,0 +1,42 @@
+person
+bicycle
+car
+motorcycle
+airplane
+bus
+train
+truck
+boat
+traffic light
+fire hydrant
+stop sign
+parking met◊t“⁄$z{-ÆÈ‹j◊ùted_names & train_names or selected_names & val_names:
+    raise RuntimeError('Final split overlap detected')
+
+(annotation_dir / 'sha256_manifest.json').write_text(json.dumps(sha_rows, indent=2), encoding='utf-8')
+summary = {
+    'status': 'complete',
+    'images': len(selected),
+    'label_files': len(list(label_dir.glob('*.txt'))),
+    'annotations': len(selected_annotations),
+    'yolo_boxes_written': sum(class_counts.values()),
+    'skipped_crowd': skipped_crowd,
+    'skipped_invalid': skipped_invalid,
+    'classes_with_annotations': len(class_counts),
+    'class_counts': {class_names[index]: count for index, count in sorted(class_counts.items())},
+    'training_overlap': 0,
+    'existing_validation_overlap': 0,
+    'downloaded_this_run': downloaded,
+    'cached': cached,
+    'total_image_bytes': total_bytes,
+    'seed': SEED,
+    'dataset_yaml': 'datasets/coco2017_independent_test.yaml',
+    'annotations_json': str(annotation_dir / 'instances_test2017.json'),
+    'sha256_manifest': str(annotation_dir / 'sha256_manifest.json'),
+}
+(annotation_dir / 'preparation_summary.json').write_text(json.dumps(summary, indent=2), encoding='utf-8')
+print(json.dumps(summary, indent=2), flush=True)
+
+
+
+

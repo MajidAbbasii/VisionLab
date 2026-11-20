@@ -1,0 +1,19 @@
+# Reproducible baseline training with a held-out COCO2017 validation set.
+model: yolo11n.pt
+data: datasets/coco128_train_coco2017_val.yaml
+epochs: 50
+imgsz: 640
+batch: 4
+workers: 2
+seed: 42
+patience: 20
+pretrained: true
+optimizer: auto
+close_mosaic: 10
+amp: false
+plots: true
+project: experiments/training_independent
+name: baseline_coco128_train_coco2017_val
+exist_ok: false
+checkpoint_output: models/trained/best_coco128_train_coco2017_val.pt
+metrics_output: results/metrics/training_coco128_train_coco2017_val.csv
