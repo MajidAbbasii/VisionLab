@@ -21,10 +21,11 @@
     </a>
     <nav aria-label="Main navigation">
       <a href="#demo">Live demo</a>
+      <a href="#video-demo">Video & webcam</a>
       <a href="#about">About</a>
       <a href="#model">Model card</a>
     </nav>
-    <a class="nav-cta" href="./LICENSE">AGPL-3.0 <span aria-hidden="true">↗</span></a>
+    <a class="nav-cta" href="https://github.com/MajidAbbasii/VisionLab/blob/master/README.fa.md">راهنمای فارسی <span aria-hidden="true">↗</span></a>
   </header>
 
   <main id="top">
@@ -110,6 +111,45 @@
       <p class="privacy-note"><span aria-hidden="true">◈</span> <strong>Private by design.</strong> Image preprocessing and inference run locally in your browser using WebAssembly. Images are not uploaded to a server.</p>
     </section>
 
+    <section id="video-demo" class="media-section shell">
+      <div class="section-heading"><div><div class="eyebrow">VIDEO & LIVE CAMERA</div><h2>Bring detection to motion</h2></div><div class="runtime-pill"><span class="runtime-dot"></span><span>Same YOLO11n ONNX model</span></div></div>
+      <div class="media-grid">
+        <article class="media-card">
+          <div class="demo-toolbar"><div class="demo-step"><span>04</span> VIDEO FILE</div><div class="toolbar-hint">MP4, WEBM or OGG · up to 100 MB / 5 min</div></div>
+          <div class="media-preview"><video id="video-source" controls playsinline preload="metadata" hidden></video><canvas id="video-canvas" aria-label="Video frames with object detection overlays" hidden></canvas><div class="media-placeholder" id="video-placeholder">Choose a video to preview and analyze</div></div>
+          <div class="media-controls">
+            <input id="video-input" type="file" accept="video/mp4,video/webm,video/ogg" hidden>
+            <button class="button button-secondary" id="browse-video" type="button">Choose video</button>
+            <button class="button button-primary" id="process-video" type="button" disabled>Process video</button>
+            <button class="button button-secondary" id="stop-video" type="button" disabled>Stop</button>
+            <button class="button button-secondary" id="download-video" type="button" disabled>Download result</button>
+          </div>
+          <p class="status-message" id="video-status" role="status" aria-live="polite">Load the model above, then choose a local video. Processing runs in this browser.</p>
+        </article>
+        <article class="media-card">
+          <div class="demo-toolbar"><div class="demo-step"><span>05</span> LIVE WEBCAM</div><div class="toolbar-hint">Camera permission required</div></div>
+          <div class="media-preview"><video id="camera-source" autoplay muted playsinline hidden></video><canvas id="camera-canvas" aria-label="Live camera with object detection overlays"></canvas><div class="media-placeholder" id="camera-placeholder">Camera preview will appear here</div></div>
+          <div class="media-controls">
+            <button class="button button-secondary" id="start-camera" type="button" disabled>Start camera</button>
+            <button class="button button-primary" id="stop-camera" type="button" disabled>Stop camera</button>
+          </div>
+          <p class="status-message" id="camera-status" role="status" aria-live="polite">First load the YOLO11 model above. Then allow camera access when your browser asks. Camera requires HTTPS or localhost.</p>
+        </article>
+      </div>
+      <div class="analytics-card" id="analytics" aria-live="polite">
+        <div class="demo-toolbar"><div class="demo-step"><span>06</span> DETECTION ANALYTICS</div><div class="toolbar-hint" id="analytics-source">Waiting for inference</div></div>
+        <div class="analytics-metrics">
+          <div><strong id="metric-count">—</strong><span>Objects in latest frame</span></div>
+          <div><strong id="metric-classes">—</strong><span>Unique classes</span></div>
+          <div><strong id="metric-confidence">—</strong><span>Avg. confidence (frame)</span></div>
+          <div><strong id="metric-latency">—</strong><span>Inference time</span></div>
+          <div><strong id="metric-fps">—</strong><span>Processing FPS</span></div>
+        </div>
+        <div class="analytics-detail"><div><strong>Class distribution</strong><span id="metric-frames">Frames processed: —</span></div><div id="class-distribution" class="class-distribution"><span class="empty-results">Run an image, video or webcam detection to populate analytics.</span></div></div>
+      </div>
+      <p class="privacy-note"><span aria-hidden="true">◈</span> <strong>Local processing.</strong> Video frames and camera images stay in your browser. Processed video is assembled locally when your browser supports MediaRecorder.</p>
+    </section>
+
     <section id="about" class="about-section shell">
       <div class="section-heading"><div><div class="eyebrow">THE PROJECT</div><h2>Built to learn. Made to explore.</h2></div></div>
       <div class="about-grid">
@@ -125,6 +165,6 @@
     </section>
   </main>
 
-  <footer class="footer shell"><a class="brand" href="#top"><span class="brand-mark"><span></span><span></span><span></span><span></span></span><span>Vision<span class="brand-accent">Lab</span></span></a><p>Made for learning, experimentation and open-source computer vision.</p><span class="footer-license">AGPL-3.0 · YOLO11</span></footer>
+  <footer class="footer shell"><a class="brand" href="#top"><span class="brand-mark"><span></span><span></span><span></span><span></span></span><span>Vision<span class="brand-accent">Lab</span></span></a><p>Made for learning, experimentation and open-source computer vision.</p><span class="footer-license"><a href="https://github.com/MajidAbbasii/VisionLab/blob/master/README.fa.md">راهنمای فارسی</a> · AGPL-3.0 · YOLO11</span></footer>
 </body>
 </html>

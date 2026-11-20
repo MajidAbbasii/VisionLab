@@ -1,14 +1,18 @@
-# VisionLab â€” YOLO Object Detection & Experiment Workbench
+# VisionLab — YOLO Object Detection & Experiment Workbench
+
+**راهنمای فارسی:** [README.fa.md](README.fa.md) · **دموی آنلاین:** [GitHub Pages](https://majidabbasii.github.io/VisionLab/)
 
 <p align="center"><strong>Release candidate: v1.0.0-rc1</strong></p>
-
-> **Source-only public snapshot:** ONNX model binaries and pretrained checkpoints, COCO image/label files, experiment databases and generated release artifacts are intentionally excluded pending third-party license review. To run C# inference, export a compatible YOLO detection checkpoint locally and place the resulting file at `models/exported/best.onnx`; see the ONNX export section below.
 
 VisionLab is a modular, reproducible object-detection project. It combines a Python research engine (Ultralytics YOLO + PyTorch + Optuna) with a .NET 8 inference application (ONNX Runtime + OpenCvSharp). It supports image detection, video-file/webcam capture, training, hyperparameter tuning, sensitivity analysis, augmentation ablations, metrics, plots, logs and reports.
 
 **Default model:** YOLO11n. You can select another Ultralytics-compatible checkpoint such as `yolov8n.pt`; support for YOLOv9/YOLOv10 model names depends on the installed Ultralytics release and the model's official integration. The Python engine is the reference implementation for training and research. C# consumes exported ONNX models for deployment.
 
-All dependencies are free/open-source. No paid inference API or cloud service is required. Pretrained model weights and datasets may have their own licenses; review them before commercial use. Training speed depends on hardware. A CUDA-capable GPU is recommended, but CPU execution is possible.
+VisionLab's original project source is licensed under GNU AGPL-3.0-only. Third-party packages, pretrained weights, exported models and datasets retain their own licenses and terms; the project license does not relicense those materials. See [LICENSE](LICENSE), [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), [DATASETS.md](DATASETS.md) and [MODEL_CARD.md](MODEL_CARD.md). No paid inference API or cloud service is required. Training speed depends on hardware. A CUDA-capable GPU is recommended, but CPU execution is possible.
+
+## GitHub Pages demo
+
+The `docs/` directory contains a static project showcase and an interactive YOLO11n demo for images, video files and live webcam. It runs ONNX Runtime Web with the WebAssembly CPU provider in the visitor's browser; uploaded media is not sent to a backend. The page also reports detection analytics such as object counts, confidence, inference latency and observed processing FPS. To publish it, select **Settings → Pages → Deploy from a branch → `/docs`**. See [`docs/README.md`](docs/README.md) and [`docs/README.fa.md`](docs/README.fa.md) for local testing and demo notes. Review model provenance and third-party licensing obligations before redistribution.
 
 ## 1. Architecture
 
@@ -18,7 +22,7 @@ Python research engine
        | train, validate, tune, analyze
        | export best.pt -> ONNX
        v
-models/exported/*.onnx (exported locally; not bundled in this source-only repository)
+models/exported/*.onnx
        |
        v
 .NET 8 application
@@ -57,7 +61,7 @@ The JSON report for each image includes source/output paths, image dimensions, t
 ## 2. Requirements
 
 - Windows 10/11, Linux or macOS for Python workflows (the included OpenCvSharp native runtime package is Windows-specific).
-- Python 3.10â€“3.12 recommended. Python 3.13 may not have compatible wheels for every PyTorch/Ultralytics dependency.
+- Python 3.10–3.12 recommended. Python 3.13 may not have compatible wheels for every PyTorch/Ultralytics dependency.
 - .NET 8 SDK for the C# application.
 - 8 GB RAM minimum; 16 GB+ recommended. GPU memory requirements depend on image size and batch size.
 - For the currently verified Windows environment, see `requirements-lock-py311-cu130.txt` (Python 3.11.15 / PyTorch 2.14.1+cu130). This lock is hardware/platform-specific; it is not a universal cross-platform lock.
@@ -153,7 +157,7 @@ datasets/my_dataset/
   labels/train/  labels/val/
 ```
 
-Each image has a matching `.txt` label file. Each line is `class_id x_center y_center width height`, normalized to 0â€“1. Define every class in the dataset YAML, for example:
+Each image has a matching `.txt` label file. Each line is `class_id x_center y_center width height`, normalized to 0–1. Define every class in the dataset YAML, for example:
 
 ```yaml
 path: datasets/my_dataset
@@ -331,7 +335,13 @@ Use a fixed seed, the same dataset version/split, same training budget and docum
 
 ## License
 
-Project source is provided for learning and research. Ultralytics, PyTorch, OpenCV, ONNX Runtime and model/dataset licenses remain applicable; check their current terms before redistribution or commercial deployment.
+VisionLab's original source code is licensed under **GNU Affero General Public License v3.0 only (AGPL-3.0-only)**; see [LICENSE](LICENSE). Unless a file states otherwise, this license applies to original project code and documentation, not to third-party components, datasets, pretrained checkpoints or model artifacts.
+
+Ultralytics publishes its code and YOLO models under AGPL-3.0 with an alternative Enterprise license. Its published licensing guidance states that trained/fine-tuned models and projects using its training/inference stack may carry AGPL obligations. Exporting a checkpoint to ONNX does not, by itself, remove those obligations. See [MODEL_CARD.md](MODEL_CARD.md) and the [Ultralytics licensing page](https://www.ultralytics.com/license). This is a summary of the upstream vendor's position, not a legal opinion about every possible combination or distribution.
+
+Third-party dependency licenses are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md); their own license terms prevail for those components. In particular, the Windows OpenCvSharp runtime includes an FFmpeg video backend under LGPL-2.1-or-later, separate from OpenCvSharp/OpenCV's Apache-2.0 license. Its exact upstream corresponding-source archives, build scripts and hashes are retained under `THIRD-PARTY-SOURCES/FFmpeg-4.x_20240522/`, and the release script is configured to include and verify them alongside the DLL. The OpenCV 4.10.0 archive's 30 bundled license files and the 18 Tesseract-vcpkg copyright files are retained under `THIRD-PARTY-NOTICES/`. The ONNX Runtime native package's embedded build commit is identified, and an Eigen 3.4.0 source candidate/MPL-2.0 text is staged under `THIRD-PARTY-SOURCES/ONNXRuntime-1.20.1/`; the exact Microsoft Eigen pin and Intel MKL applicability still need confirmation. Release also remains blocked by Intel IPP static-link/EULA review, exact OpenCvSharp package build attestation, final ZIP-level source-delivery verification and qualified LGPL review. The Windows package includes only COCO's 80 category names with CC BY 4.0 attribution; it excludes COCO/Flickr images and annotation payloads. See [DATASETS.md](DATASETS.md). Do not redistribute images, full annotations, weights or exported models unless you have confirmed the applicable rights and notices.
+
+For network-accessible modified versions of an AGPL-covered program, review section 13 of AGPL-3.0 regarding offering Corresponding Source to remote users. Before a production/commercial deployment or a distribution containing trained weights, obtain legal review of the complete combination and its Corresponding Source obligations.
 
 
 ## Current educational run (November 2026)
@@ -346,4 +356,3 @@ The ten-image C# versus Python ONNX parity experiment (31/31 matched detections,
 The additional seven-shape C# edge-case smoke test and automated .NET integration-test results are documented in [results/reports/csharp_edge_case_validation_2026-11-20.md](results/reports/csharp_edge_case_validation_2026-11-20.md).
 
 The current release candidate packaging and known limitations are tracked in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md), [CHANGELOG.md](CHANGELOG.md) and [results/reports/release_candidate_v1.0.0-rc1.md](results/reports/release_candidate_v1.0.0-rc1.md). Run `scripts/verify_release.ps1` before creating a release tag.
-
